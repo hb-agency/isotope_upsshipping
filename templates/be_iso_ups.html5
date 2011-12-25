@@ -1,0 +1,39 @@
+<div class="tl_content block multipleshipping" style="padding:10px 0;">
+
+<form action="<?php echo $this->action; ?>" method="post">
+<input type="hidden" name="FORM_SUBMIT" value="<?php echo $this->formid; ?>">
+<input type="hidden" name="REQUEST_TOKEN" value="<?php echo REQUEST_TOKEN; ?>">
+<table cellpadding="0" cellspacing="0" border="0" summary="Shipping Details">
+<thead>
+	<tr>
+	<th class="address col_0" style="width:180px;"><?php echo $this->addressHeader; ?></th>
+	<th class="label col_1" style="width:120px;"><?php echo $this->labelHeader; ?></th>
+	<th class="tracking col_2" style="width:140px;"><?php echo $this->trackingHeader; ?></th>
+	<th class="status col_3" style="width:90px;"><?php echo $this->statusHeader; ?></th>
+	<th class="submit col_4 col_last"></th>
+	</tr>
+</thead>
+<tbody>
+	<tr>
+	<td class="address col_0">
+		<p><?php echo $this->formattedaddress; ?></p>
+	</td>
+	<td class="label col_1"><?php if($this->label): ?>
+		<a href="<?php echo $this->labelLink; ?>" title="Print Label">
+		<img src="<?php echo $this->label; ?>" />
+		</a>
+	<?php endif; ?></td>
+	<td class="tracking col_2">
+	<?php if($this->tracking): ?>
+		<a href="<?php echo $this->trackingLink; ?>" title="Send email to customer">
+		<?php echo $this->tracking; ?>
+		</a>
+	<?php endif; ?></td>
+	<td class="status col_3"><?php echo $this->status; ?></td>
+	<td class="submit col_4 col_last"><input type="submit" class="tl_submit" value="<?php echo $this->submitLabel; ?>"></td>
+	</tr>
+</tbody>
+</table>
+
+</form>
+</div>
