@@ -59,7 +59,8 @@ class ShippingUPSMultiple extends IsotopeShipping
 			$arrShipment = array(
 				'address' => $this->Isotope->Cart->shippingAddress,
 				'products'	=> $arrProducts,
-				'productids' => $arrProductIds
+				'productids' => $arrProductIds,
+				'quantity'	=> $this->Isotope->Cart->items
 			);
 		}
 		
@@ -101,7 +102,7 @@ class ShippingUPSMultiple extends IsotopeShipping
 				list($arrOrigin, $arrDestination, $arrShipment) = $arrPackage;
 				
 				//Cache the request so we don't have to run it again as the API is slow
-				$strRequestHash = md5(implode('.',$arrDestination) . $arrShipment['service'] . $arrShipment['weight'] . implode('.',$this->Shipment['productids']));
+				$strRequestHash = md5(implode('.',$arrDestination) . $arrShipment['service'] . $arrShipment['weight'] . implode('.',$this->Shipment['productids']) . $this->Shipment['quantity']);
 				
 				// Construct UPS Object: For now, Origin is assumed to be the same for origin and shipping info
 				$objUPSAPI = new UpsAPIRatesAndService($arrShipment, $arrOrigin, $arrOrigin, $arrDestination); 
