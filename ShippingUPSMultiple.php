@@ -84,6 +84,7 @@ class ShippingUPSMultiple extends IsotopeShipping
 				if(!count($this->Shipment))
 					return 0;
 					
+				$blnShowError = false;
 				$strPrice = $this->arrData['price'];
 				$blnPercentage = substr($strPrice, -1) == '%' ? true : false;
 
@@ -103,11 +104,6 @@ class ShippingUPSMultiple extends IsotopeShipping
 				
 				//Cache the request so we don't have to run it again as the API is slow
 				$strRequestHash = md5(implode('.',$arrDestination) . $arrShipment['service'] . $arrShipment['weight'] . implode('.',$this->Shipment['productids']) . $this->Shipment['quantity']);
-				
-				// Construct UPS Object: For now, Origin is assumed to be the same for origin and shipping info
-				$objUPSAPI = new UpsAPIRatesAndService($arrShipment, $arrOrigin, $arrOrigin, $arrDestination); 
-				
-				$strRequestXML = $objUPSAPI->buildRequest('RatingServiceSelectionRequest');
 								
 				if( $_SESSION['CHECKOUT_DATA']['UPS'][$strRequestHash])
 				{
@@ -115,19 +111,23 @@ class ShippingUPSMultiple extends IsotopeShipping
 				}
 				else
 				{
+					// Construct UPS Object: For now, Origin is assumed to be the same for origin and shipping info
+					$objUPSAPI = new UpsAPIRatesAndService($arrShipment, $arrOrigin, $arrOrigin, $arrDestination); 
+					$strRequestXML = $objUPSAPI->buildRequest('RatingServiceSelectionRequest');
 					$arrResponse = $objUPSAPI->sendRequest($strRequestXML);
 					$_SESSION['CHECKOUT_DATA']['UPS'][$strRequestHash] = $arrResponse;
+					$blnShowError = true;
 				}			
 				if((int)$arrResponse['RatingServiceSelectionResponse']['Response']['ResponseStatusCode']==1)
 				{
 					$fltUPSPrice = floatval($arrResponse['RatingServiceSelectionResponse']['RatedShipment']['RatedPackage']['TotalCharges']['MonetaryValue']);
 				}
-				else
+				elseif($blnShowError)
 				{
-					
+					//Log and display error if this is not an AJAX request to prevent a billion error msgs
 					$strLogMessage = sprintf('Error in shipping digest: %s - %s',$arrResponse['RatingServiceSelectionResponse']["Response"]["ResponseStatusDescription"], $arrResponse['RatingServiceSelectionResponse']["Response"]["Error"]["ErrorDescription"]);
 					$strMessage = sprintf('%s - %s',$arrResponse['RatingServiceSelectionResponse']["Response"]["ResponseStatusDescription"], $arrResponse['RatingServiceSelectionResponse']["Response"]["Error"]["ErrorDescription"]);
-					$_SESSION['ISO_ERROR'][] = $strMessage;
+					$_SESSION['ISO_ERROR']['ups'] = $strMessage;
 					$this->log($strLogMessage, __METHOD__, TL_ERROR);	
 				}
 				return $this->Isotope->calculatePrice(($fltPrice + $fltUPSPrice), $this, 'price', $this->arrData['tax_class']);
