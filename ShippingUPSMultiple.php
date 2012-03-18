@@ -465,7 +465,8 @@ class ShippingUPSMultiple extends IsotopeShipping
 		foreach( $arrProducts as $objProduct )
 		{
 			$arrWeight = deserialize($objProduct->shipping_weight, true);
-			$arrWeight['value'] = floatval($arrWeight['value']);
+			$intQuantity = $objProduct->quantity_requested > 0 ? $objProduct->quantity_requested : 1;
+			$arrWeight['value'] = floatval($arrWeight['value']) * $intQuantity;
 
 			$arrWeights[] = $arrWeight;
 		}
