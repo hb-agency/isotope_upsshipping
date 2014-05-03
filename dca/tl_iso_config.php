@@ -1,27 +1,12 @@
-<?php if (!defined('TL_ROOT')) die('You can not access this file directly!');
+<?php
 
 /**
- * TYPOlight Open Source CMS
- * Copyright (C) 2005-2010 Leo Feyer
+ * UPS Integration for Isotope eCommerce for Contao Open Source CMS
  *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation, either
- * version 3 of the License, or (at your option) any later version.
+ * Copyright (C) 2014 HB Agency
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program. If not, please visit the Free
- * Software Foundation website at <http://www.gnu.org/licenses/>.
- *
- * PHP version 5
- * @copyright  Winans Creative 2009, Intelligent Spark 2010, iserv.ch GmbH 2010
- * @author     Fred Bliss <fred.bliss@intelligentspark.com>
- * @author     Andreas Schempp <andreas@schempp.ch>
+ * @package    Isotope_UPSShipping
+ * @link       http://www.hbagency.com
  * @license    http://opensource.org/licenses/lgpl-3.0.html
  */
 
@@ -41,7 +26,8 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['enableUps'] = array
 	'label'                   => &$GLOBALS['TL_LANG']['tl_iso_config']['enableUps'],
 	'exclude'                 => true,
 	'inputType'               => 'checkbox',
-	'eval'						=> array('doNotCopy'=>true, 'submitOnChange'=>true),
+	'eval'					  => array('doNotCopy'=>true, 'submitOnChange'=>true),
+	'sql'                     => "char(1) NOT NULL default ''"
 );
 
 $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsAccessKey'] = array
@@ -50,6 +36,7 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsAccessKey'] = array
 	'exclude'                 => true,
 	'inputType'               => 'text',
 	'eval'                    => array('mandatory'=>true, 'maxlength'=>255, 'tl_class'=>'w50'),
+	'sql'                     => "varchar(255) NOT NULL default ''"
 );
 		
 $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsUsername'] = array
@@ -58,6 +45,7 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsUsername'] = array
 	'exclude'                 => true,
 	'inputType'               => 'text',
 	'eval'                    => array('mandatory'=>true, 'maxlength'=>255, 'tl_class'=>'w50 clr'),
+	'sql'                     => "varchar(255) NOT NULL default ''"
 );
 		
 $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsPassword'] = array
@@ -66,6 +54,7 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsPassword'] = array
 	'exclude'                 => true,
 	'inputType'               => 'text',
 	'eval'                    => array('mandatory'=>true, 'maxlength'=>255, 'hideInput'=>true),
+	'sql'                     => "varchar(255) NOT NULL default ''"
 );
 
 $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsAccountNumber'] = array
@@ -74,6 +63,7 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsAccountNumber'] = array
 	'exclude'                 => true,
 	'inputType'               => 'text',
 	'eval'                    => array('maxlength'=>255, 'tl_class'=>'w50'),
+	'sql'                     => "varchar(255) NOT NULL default ''"
 );
 
 $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsMode'] = array
@@ -84,5 +74,6 @@ $GLOBALS['TL_DCA']['tl_iso_config']['fields']['UpsMode'] = array
 	'inputType'               => 'select',
 	'options'				  => array('test','live'),
 	'eval'					  => array('doNotCopy'=>true, 'tl_class'=>'w50'),
-	'reference'				  => &$GLOBALS['TL_LANG']['MSC']['apiMode']
+	'reference'				  => &$GLOBALS['TL_LANG']['MSC']['apiMode'],
+	'sql'                     => "varchar(8) NOT NULL default ''"
 );

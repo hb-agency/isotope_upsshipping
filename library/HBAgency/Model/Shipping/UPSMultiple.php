@@ -34,7 +34,7 @@ class ShippingUPSMultiple extends IsotopeShipping
 	 * @var array
 	 */
 	protected $Shipment;
-
+	protected $blnShowError = false;
 	/**
 	 * Initialize the object
 	 *
@@ -81,8 +81,31 @@ class ShippingUPSMultiple extends IsotopeShipping
 		switch( $strKey )
 		{
 			case 'price':
-				if(!count($this->Shipment))
+				$arrShipment = $this->Shipment;
+				
+				if(	!count($this->Shipment) ||
+					($arrShipment['address']['postal']==$this->Isotope->Config->postal && 
+					$arrShipment['address']['subdivision']==$this->Isotope->Config->subdivision && 
+					$arrShipment['address']['country']==$this->Isotope->Config->country && 
+					(!isset($arrShipment['address']['firstname']) ||
+					!isset($arrShipment['address']['lastname']) ||
+					!isset($arrShipment['address']['city']) ||
+					!isset($arrShipment['address']['subdivision']) ||
+					!isset($arrShipment['address']['postal']) ||
+					!isset($arrShipment['address']['country']) ||
+					!isset($arrShipment['address']['street_1'])) ||
+					($arrShipment['address']['firstname']=='' ||
+					 $arrShipment['address']['lastname']=='' ||
+					 $arrShipment['address']['city']=='' ||
+					 $arrShipment['address']['subdivision']=='' ||
+					 $arrShipment['address']['postal']=='' ||
+					 $arrShipment['address']['country']=='' ||
+					 $arrShipment['address']['street_1']=='')
+				  ))
+				{
+				
 					return 0;
+				}
 					
 				$blnShowError = false;
 				$strPrice = $this->arrData['price'];
@@ -101,10 +124,10 @@ class ShippingUPSMultiple extends IsotopeShipping
 				$arrPackage = $this->buildShipment();
 
 				list($arrOrigin, $arrDestination, $arrShipment) = $arrPackage;
-				
+
 				//Cache the request so we don't have to run it again as the API is slow
 				$strRequestHash = md5(implode('.',$arrDestination) . $arrShipment['service'] . $arrShipment['weight'] . implode('.',$this->Shipment['productids']) . $this->Shipment['quantity']);
-								
+												
 				if( $_SESSION['CHECKOUT_DATA']['UPS'][$strRequestHash])
 				{
 					$arrResponse = $_SESSION['CHECKOUT_DATA']['UPS'][$strRequestHash];
@@ -116,25 +139,50 @@ class ShippingUPSMultiple extends IsotopeShipping
 					$strRequestXML = $objUPSAPI->buildRequest('RatingServiceSelectionRequest');
 					$arrResponse = $objUPSAPI->sendRequest($strRequestXML);
 					$_SESSION['CHECKOUT_DATA']['UPS'][$strRequestHash] = $arrResponse;
-					$blnShowError = true;
-				}			
+					if($this->blnShowError){
+						$blnShowError = true;
+					}
+				}
+						
 				if((int)$arrResponse['RatingServiceSelectionResponse']['Response']['ResponseStatusCode']==1)
 				{
-					$fltUPSPrice = floatval($arrResponse['RatingServiceSelectionResponse']['RatedShipment']['RatedPackage']['TotalCharges']['MonetaryValue']);
+					$fltUPSPrice = floatval($arrResponse['RatingServiceSelectionResponse']['RatedShipment']['TotalCharges']['MonetaryValue']);
+					
 				}
 				elseif($blnShowError)
 				{
-					//Log and display error if this is not an AJAX request to prevent a billion error msgs
 					$strLogMessage = sprintf('Error in shipping digest: %s - %s',$arrResponse['RatingServiceSelectionResponse']["Response"]["ResponseStatusDescription"], $arrResponse['RatingServiceSelectionResponse']["Response"]["Error"]["ErrorDescription"]);
-					$strMessage = sprintf('%s - %s',$arrResponse['RatingServiceSelectionResponse']["Response"]["ResponseStatusDescription"], $arrResponse['RatingServiceSelectionResponse']["Response"]["Error"]["ErrorDescription"]);
-					$_SESSION['ISO_ERROR']['ups'] = $strMessage;
-					$this->log($strLogMessage, __METHOD__, TL_ERROR);	
+						$strMessage = sprintf('%s - %s',$arrResponse['RatingServiceSelectionResponse']["Response"]["ResponseStatusDescription"], $arrResponse['RatingServiceSelectionResponse']["Response"]["Error"]["ErrorDescription"]);
+				
+					if( (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')  ){
+						// add something if this is an ajax with error?
+					}
+					else{	
+						//Log and display error if this is not an AJAX request to prevent a billion error msgs
+						$_SESSION['ISO_ERROR']['ups'] = $strMessage;
+							
+					}
+					
+					$this->log($strLogMessage, __METHOD__, TL_ERROR);
 				}
+															
 				return $this->Isotope->calculatePrice(($fltPrice + $fltUPSPrice), $this, 'price', $this->arrData['tax_class']);
 				break;
 				
 			case 'available':
-				return ($this->price > 0 ? parent::__get('available') : false);
+				$blnAvailable = ($this->price > 0 ? parent::__get('available') : false);
+			
+				// HOOK for determining availability
+				if (isset($GLOBALS['ISO_HOOKS']['shippingAvailable']) && is_array($GLOBALS['ISO_HOOKS']['shippingAvailable']))
+				{
+					foreach ($GLOBALS['ISO_HOOKS']['shippingAvailable'] as $callback)
+					{
+						$this->import($callback[0]);
+						$blnAvailable = $this->$callback[0]->$callback[1]($blnAvailable, $this);
+					}
+				}
+			
+				return $blnAvailable;
 				break;
 		}
 
@@ -337,10 +385,11 @@ class ShippingUPSMultiple extends IsotopeShipping
 			
 			list($arrOrigin, $arrDestination, $arrShipment) = $this->buildShipment();
 			
-			$objUPSAPI = new UpsAPIShipping($arrShipment, $arrOrigin, $arrOrigin, $arrDestination);
-			$xmlShip = $objUPSAPI->buildRequest();
-			$arrResponse = $objUPSAPI->sendRequest($xmlShip);
-			
+			if ($this->isValidDestination($arrDestination)){
+				$objUPSAPI = new UpsAPIShipping($arrShipment, $arrOrigin, $arrOrigin, $arrDestination);
+				$xmlShip = $objUPSAPI->buildRequest();
+				$arrResponse = $objUPSAPI->sendRequest($xmlShip);
+			}
 			//Request was successful - add the new data to the package
 			if((int)$arrResponse['ShipmentAcceptResponse']['Response']['ResponseStatusCode']==1)
 			{				
@@ -357,6 +406,9 @@ class ShippingUPSMultiple extends IsotopeShipping
 				$strCacheName = 'system/html/ups_label_' . $objOrder->order_id . '_' . $objPackage->id . substr(md5($arrPackage['formattedaddress']), 0, 8) . '.gif';
 				$arrPackage['label'] = $this->getShippingLabelImage($objOrder->ups_label, $strCacheName);
 				$arrPackage['tracking'] = $objOrder->ups_tracking_number;
+			}
+			elseif($this->isValidDestination($arrDestination) == false){
+			
 			}
 			else
 			{
@@ -394,21 +446,47 @@ class ShippingUPSMultiple extends IsotopeShipping
 		$arrPackage = $this->Shipment;
 		
 		$arrSubDivisionShipping = explode('-',$arrPackage['address']['subdivision']);
-	
-		$arrDestination = array
-		(
-			'name'			=> $arrPackage['address']['firstname'] . ' ' . $arrPackage['address']['lastname'],
-			'company'		=> $arrPackage['address']['company'],
-			'street'		=> strtoupper($arrPackage['address']['street_1']),
-			'street2'		=> strtoupper($arrPackage['address']['street_2']),
-			'street3'		=> strtoupper($arrPackage['address']['street_3']),
-			'city'			=> strtoupper($arrPackage['address']['city']),
-			'state'			=> $arrSubDivisionShipping[1],
-			'zip'			=> $arrPackage['address']['postal'],
-			'country'		=> strtoupper($arrPackage['address']['country'])
-		);
-
 		$arrSubDivisionStore = explode('-',$this->Isotope->Config->subdivision);
+		$this->blnShowError = false;
+
+		if( 
+			(strtoupper($arrPackage['address']['street_1']) == strtoupper($this->Isotope->Config->street_1) ) &&
+			(strtoupper($arrPackage['address']['city']) == strtoupper($this->Isotope->Config->city) ) &&
+			(strtoupper($arrPackage['address']['postal']) == strtoupper($this->Isotope->Config->postal) ) &&
+			(strtoupper($arrSubDivisionShipping[1]) == strtoupper($arrSubDivisionStore[1]) )
+			
+			)
+		{	
+			
+			$this->blnShowError = true;
+			$arrDestination = array
+			(
+				'name'			=> '',
+				'company'		=> '',
+				'street'		=> '',
+				'street2'		=> '',
+				'street3'		=> '',
+				'city'			=> '',
+				'state'			=> '',
+				'zip'			=> '',
+				'country'		=> ''
+			);
+		}
+		else
+		{
+			$arrDestination = array
+			(
+				'name'			=> $arrPackage['address']['firstname'] . ' ' . $arrPackage['address']['lastname'],
+				'company'		=> $arrPackage['address']['company'],
+				'street'		=> strtoupper($arrPackage['address']['street_1']),
+				'street2'		=> strtoupper($arrPackage['address']['street_2']),
+				'street3'		=> strtoupper($arrPackage['address']['street_3']),
+				'city'			=> strtoupper($arrPackage['address']['city']),
+				'state'			=> $arrSubDivisionShipping[1],
+				'zip'			=> $arrPackage['address']['postal'],
+				'country'		=> strtoupper($arrPackage['address']['country'])
+			);
+		}	
 
 		$arrOrigin = array
 		(
@@ -429,7 +507,7 @@ class ShippingUPSMultiple extends IsotopeShipping
 
 		$arrShipment['pickup_type']	= array
 		(
-			'code'			=> '03',		//default to one-time, but needs perhaps to be chosen by store admin.
+			'code'			=> '01',		//default to one-time, but needs perhaps to be chosen by store admin.
 			'description'	=> ''
 		);
 
@@ -603,6 +681,36 @@ class ShippingUPSMultiple extends IsotopeShipping
 		return $pdf;
 	}
 	
+	
+	
+	protected function isValidDestination($arrDestination)
+	{
+		if( strlen($arrDestination['street']) > 0 && strlen($arrDestination['zip']) > 0 && strlen($arrDestination['country']) > 0 && strlen($arrDestination['state']) > 0 && strlen($arrDestination['city']) > 0){
+			return true;
+		}
+		else{
+			return false;
+		}
+	
+	}
+	
+	/**
+	 * Get the checkout surcharge for this shipping method
+	 */
+	public function getSurcharge($objCollection)
+	{
+		if ($this->price == 0)
+		{
+			return false;
+		}
+
+		return $this->Isotope->calculateSurcharge(
+								$this->price,
+								($GLOBALS['TL_LANG']['MSC']['shippingLabel'] . ' (' . $this->label . ')'),
+								$this->arrData['tax_class'],
+								$objCollection->getProducts(),
+								$this);
+	}
 	
 }
 
